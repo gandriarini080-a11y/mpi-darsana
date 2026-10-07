@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPI SMA - Darsana</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Google Fonts: Plus Jakarta Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            dark: '#0f172a',    // slate-900
+                            base: '#1e293b',    // slate-800
+                            light: '#334155',   // slate-700
+                            accent1: '#3b82f6', // blue-500
+                            accent2: '#8b5cf6', // violet-500
+                            accent3: '#10b981', // emerald-500
+                        }
+                    },
+                    animation: {
+                        'blob': 'blob 7s infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s ease-out forwards',
+                    },
+                    keyframes: {
+                        blob: {
+                            '0%': { transform: 'translate(0px, 0px) scale(1)' },
+                            '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+                            '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+                            '100%': { transform: 'translate(0px, 0px) scale(1)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        /* Glassmorphism Utilities */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        
+        .glass-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.01) 100%);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(59, 130, 246, 0.3);
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.15);
+            transform: translateY(-5px);
+        }
+
+        /* Text Gradients */
+        .text-gradient {
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-image: linear-gradient(to right, #60a5fa, #a78bfa);
+        }
+
+        /* Flip Card for Pemantik */
+        .flip-card {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        .flip-card-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+        .flip-card.flipped .flip-card-inner {
+            transform: rotateY(180deg);
+        }
+        .flip-card-front, .flip-card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            -webkit-backface-visibility: hidden;
+            backface-visibility: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem;
+            border-radius: 1rem;
+        }
+        .flip-card-back {
+            transform: rotateY(180deg);
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
+            border: 1px solid rgba(139,92,246,0.3);
+        }
+
+        /* Hide all sections by default except active */
+        .spa-section { display: none; }
+        .spa-section.active { display: block; animation: fadeIn 0.4s ease-out forwards; }
+        
+        /* Tab active state */
+        .tab-btn.active {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen flex flex-col relative">
+
+    <!-- Background Orbs -->
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10 pointer-events-none">
+        <div class="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500 rounded-full mix-blend-screen filter blur-[100px] opacity-20 animate-blob"></div>
+        <div class="absolute top-1/3 right-1/4 w-72 h-72 bg-purple-500 rounded-full mix-blend-screen filter blur-[100px] opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-1/4 left-1/2 w-72 h-72 bg-emerald-500 rounded-full mix-blend-screen filter blur-[100px] opacity-10 animate-blob animation-delay-4000"></div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <nav class="glass-panel fixed w-full z-50 top-0 transition-all duration-300 border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo & Title -->
+                <div class="flex items-center gap-3 cursor-pointer group" onclick="navTo('home')">
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform">
+                        <i class="fa-solid fa-om text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-tight tracking-wide text-white">MPI Hindu <span class="text-xs text-blue-400 align-top">SMA XI</span></h1>
+                        <p class="text-[10px] text-gray-400 uppercase tracking-widest font-semibold">Bab: Darsana</p>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center gap-2">
+                    <button id="btn-audio" class="w-10 h-10 rounded-full glass-card flex items-center justify-center text-gray-300 hover:text-white transition-colors" onclick="toggleAudio()" title="Toggle Suara">
+                        <i class="fa-solid fa-volume-up"></i>
+                    </button>
+                    <button class="w-10 h-10 rounded-full glass-card flex items-center justify-center text-gray-300 hover:text-white md:hidden transition-colors" onclick="toggleMobileMenu()">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Container -->
+    <main class="flex-grow pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full z-10">
+
+        <!-- SECTION 1: HOME (Hero & Menu) -->
+        <section id="home" class="spa-section active">
+            <div class="text-center mb-12 animate-slide-up">
+                <span class="inline-block py-1 px-3 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-semibold mb-4 backdrop-blur-sm">
+                    Pendidikan Agama Hindu & Budi Pekerti
+                </span>
+                <h2 class="text-4xl md:text-6xl font-bold mb-4">
+                    Memahami <span class="text-gradient">Darsana</span>
+                </h2>
+                <p class="text-gray-400 max-w-2xl mx-auto text-lg">
+                    Sistem pemikiran filsafat Hindu untuk mencari hakikat kebenaran, menajamkan logika, dan mencapai tujuan tertinggi kehidupan.
+                </p>
+                <button onclick="navTo('tujuan')" class="mt-8 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-8 rounded-full shadow-lg shadow-blue-500/30 transform transition hover:-translate-y-1 hover:shadow-blue-500/50">
+                    <i class="fa-solid fa-rocket mr-2"></i> Mulai Eksplorasi
+                </button>
+            </div>
+
+            <!-- Grid Menu Navigasi -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-8">
+                <div class="glass-card rounded-2xl p-6 cursor-pointer flex flex-col items-center text-center group" onclick="navTo('tujuan')">
+                    <div class="w-14 h-14 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-2xl mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-bullseye"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">Tujuan Belajar</h3>
+                    <p class="text-xs text-gray-400">Target kompetensi materi</p>
+                </div>
+                
+                <div class="glass-card rounded-2xl p-6 cursor-pointer flex flex-col items-center text-center group" onclick="navTo('pemantik')">
+                    <div class="w-14 h-14 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 text-2xl mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-lightbulb"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">Pemantik</h3>
+                    <p class="text-xs text-gray-400">Pemanasan daya pikir</p>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 cursor-pointer flex flex-col items-center text-center group border-blue-500/30" onclick="navTo('materi')">
+                    <div class="w-14 h-14 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-2xl mb-4 group-hover:scale-110 transition-transform shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+                        <i class="fa-solid fa-book-open"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">Materi Interaktif</h3>
+                    <p class="text-xs text-gray-400">Sad Darsana & Simulasi</p>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 cursor-pointer flex flex-col items-center text-center group" onclick="navTo('evaluasi')">
+                    <div class="w-14 h-14 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-2xl mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fa-solid fa-gamepad"></i>
+                    </div>
+                    <h3 class="font-bold text-lg mb-2">Kuis & Refleksi</h3>
+                    <p class="text-xs text-gray-400">Uji pemahamanmu</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECTION 2: TUJUAN PEMBELAJARAN -->
+        <section id="tujuan" class="spa-section">
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold"><i class="fa-solid fa-bullseye text-blue-400 mr-2"></i> Tujuan Pembelajaran</h2>
+                    <p class="text-gray-400 mt-1">Apa yang akan kamu kuasai setelah sesi ini?</p>
+                </div>
+                <button onclick="navTo('home')" class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/5"><i class="fa-solid fa-arrow-left mr-1"></i> Kembali</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                    <div class="absolute -right-6 -top-6 text-6xl opacity-5 group-hover:scale-110 transition-transform"><i class="fa-solid fa-brain"></i></div>
+                    <div class="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 mb-4 font-bold">1</div>
+                    <h3 class="font-bold text-lg mb-2">Memahami Konsep</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Menjelaskan pengertian Darsana sebagai sistem filsafat atau cara pandang untuk mencari kebenaran dalam tradisi Hindu.</p>
+                </div>
+                
+                <div class="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                    <div class="absolute -right-6 -top-6 text-6xl opacity-5 group-hover:scale-110 transition-transform"><i class="fa-solid fa-network-wired"></i></div>
+                    <div class="w-10 h-10 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 mb-4 font-bold">2</div>
+                    <h3 class="font-bold text-lg mb-2">Mengidentifikasi Sistem</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Menyebutkan dan membedakan enam bagian Sad Darsana (Nyaya, Vaiseshika, Samkhya, Yoga, Mimamsa, Vedanta) beserta tokoh pendirinya.</p>
+                </div>
+
+                <div class="glass-card rounded-2xl p-6 relative overflow-hidden group">
+                    <div class="absolute -right-6 -top-6 text-6xl opacity-5 group-hover:scale-110 transition-transform"><i class="fa-solid fa-hands-holding-circle"></i></div>
+                    <div class="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 font-bold">3</div>
+                    <h3 class="font-bold text-lg mb-2">Penerapan Praktis</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">Menerapkan nilai-nilai Sad Darsana dalam kehidupan sehari-hari seperti berpikir logis, disiplin diri, dan menjalankan tanggung jawab.</p>
+                </div>
+            </div>
+
+            <div class="mt-8 text-right">
+                <button onclick="navTo('pemantik')" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-lg">
+                    Lanjut ke Pemantik <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION 3: PERTANYAAN PEMANTIK -->
+        <section id="pemantik" class="spa-section">
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold"><i class="fa-solid fa-lightbulb text-amber-400 mr-2"></i> Pertanyaan Pemantik</h2>
+                    <p class="text-gray-400 mt-1">Klik kartu di bawah ini untuk membuka perspektifmu!</p>
+                </div>
+                <button onclick="navTo('tujuan')" class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/5"><i class="fa-solid fa-arrow-left mr-1"></i> Kembali</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- Card 1 -->
+                <div class="flip-card h-64" onclick="toggleFlip(this); playClick();">
+                    <div class="flip-card-inner glass-card rounded-2xl shadow-xl">
+                        <div class="flip-card-front">
+                            <div class="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 text-3xl mb-4">
+                                <i class="fa-solid fa-mobile-screen-button"></i>
+                            </div>
+                            <h3 class="font-bold text-xl text-center">Situasi 1</h3>
+                            <p class="text-gray-400 text-sm mt-2 text-center">Pernahkah kamu menerima berita heboh di grup kelas/sosmed yang ternyata Hoaks?</p>
+                            <p class="text-xs text-blue-400 mt-4 animate-pulse">(Klik untuk merenung)</p>
+                        </div>
+                        <div class="flip-card-back">
+                            <i class="fa-solid fa-scale-balanced text-4xl text-blue-300 mb-3"></i>
+                            <h3 class="font-bold text-lg text-center mb-2 text-white">Logika (Nyaya)</h3>
+                            <p class="text-sm text-gray-200 text-center">Bagaimana caramu memfilter informasi tersebut? Darsana mengajarkan kita tentang <span class="font-bold text-white">Logika (Nyaya)</span> agar tidak mudah tertipu dan mampu menarik kesimpulan yang benar.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 2 -->
+                <div class="flip-card h-64" onclick="toggleFlip(this); playClick();">
+                    <div class="flip-card-inner glass-card rounded-2xl shadow-xl">
+                        <div class="flip-card-front">
+                            <div class="w-16 h-16 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 text-3xl mb-4">
+                                <i class="fa-solid fa-person-praying"></i>
+                            </div>
+                            <h3 class="font-bold text-xl text-center">Situasi 2</h3>
+                            <p class="text-gray-400 text-sm mt-2 text-center">Pernahkah kamu merasa sangat sulit fokus saat belajar karena pikiran melayang ke mana-mana?</p>
+                            <p class="text-xs text-purple-400 mt-4 animate-pulse">(Klik untuk merenung)</p>
+                        </div>
+                        <div class="flip-card-back">
+                            <i class="fa-solid fa-om text-4xl text-purple-300 mb-3"></i>
+                            <h3 class="font-bold text-lg text-center mb-2 text-white">Pengendalian (Yoga)</h3>
+                            <p class="text-sm text-gray-200 text-center">Disinilah peran penting ajaran <span class="font-bold text-white">Yoga</span>. Filsafat ini bukan sekadar senam fisik, melainkan sistem ketat untuk mendisiplinkan diri dan mengendalikan gejolak pikiran.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-12 text-center">
+                <p class="text-gray-300 mb-4">Sudah siap melihat kenyataan dari 6 sudut pandang berbeda?</p>
+                <button onclick="navTo('materi')" class="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold py-3 px-8 rounded-full transition-colors shadow-lg shadow-purple-500/30">
+                    Masuk ke Materi Utama <i class="fa-solid fa-book-open ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION 4: MATERI INTERAKTIF -->
+        <section id="materi" class="spa-section">
+            <div class="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-3xl font-bold"><i class="fa-solid fa-book-open text-purple-400 mr-2"></i> Sad Darsana</h2>
+                    <p class="text-gray-400 mt-1">Eksplorasi 6 Sistem Filsafat Hindu</p>
+                </div>
+                <button onclick="navTo('home')" class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/5 self-start"><i class="fa-solid fa-home mr-1"></i> Menu</button>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-6">
+                <!-- Sidebar Navigasi Materi -->
+                <div class="lg:w-1/4 flex flex-col gap-2">
+                    <button class="tab-btn active glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('pengertian', this)">
+                        <i class="fa-solid fa-info-circle w-6 text-center mr-1"></i> Pengertian
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('nyaya', this)">
+                        1. Nyaya
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('vaiseshika', this)">
+                        2. Vaiseshika
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('samkhya', this)">
+                        3. Samkhya
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('yoga', this)">
+                        4. Yoga
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('mimamsa', this)">
+                        5. Mimamsa
+                    </button>
+                    <button class="tab-btn glass-card text-left px-4 py-3 rounded-xl font-semibold transition-all border border-transparent hover:border-gray-500" onclick="openTab('vedanta', this)">
+                        6. Vedanta
+                    </button>
+                </div>
+
+                <!-- Konten Materi -->
+                <div class="lg:w-3/4 glass-panel rounded-2xl p-6 md:p-8 min-h-[400px] relative overflow-hidden">
+                    
+                    <!-- Tab: Pengertian -->
+                    <div id="tab-pengertian" class="tab-content block animate-fade-in">
+                        <div class="flex items-center gap-3 mb-6">
+                            <div class="p-3 bg-blue-500/20 rounded-lg text-blue-400"><i class="fa-solid fa-eye text-2xl"></i></div>
+                            <h3 class="text-2xl font-bold">Apa itu Darsana?</h3>
+                        </div>
+                        <div class="prose prose-invert max-w-none text-gray-300 space-y-4">
+                            <p class="text-lg"><strong>Darsana</strong> merupakan istilah yang digunakan untuk menyebut sistem pemikiran atau filsafat yang berusaha memahami hakikat kehidupan, pengetahuan, kebenaran, dan tujuan manusia.</p>
+                            <p>Kata <em>Darsana</em> berkaitan erat dengan makna <strong class="text-white">"melihat"</strong> atau <strong class="text-white">"pandangan"</strong>. Dalam konteks filsafat Hindu, Darsana dipahami sebagai suatu <strong>cara pandang terhadap realitas dan kehidupan</strong>.</p>
+                            <div class="bg-brand-base p-4 rounded-xl border border-white/10 mt-4">
+                                <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-rocket text-blue-400 mr-2"></i>Fungsi Darsana</h4>
+                                <ul class="list-disc pl-5 space-y-1">
+                                    <li>Mengembangkan kemampuan berpikir.</li>
+                                    <li>Memahami pengetahuan.</li>
+                                    <li>Mencari kebenaran.</li>
+                                    <li>Mengarahkan kehidupan menuju tujuan yang lebih tinggi.</li>
+                                </ul>
+                            </div>
+                            <p class="mt-4">Dalam tradisi Hindu dikenal enam sistem filsafat yang disebut <strong>Sad Darsana</strong>. Keenam sistem ini memiliki karakteristik dan fokus pemikiran yang berbeda, tetapi sama-sama memberikan kontribusi besar terhadap perkembangan pemikiran Hindu.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Nyaya (Includes Interactive Simulation) -->
+                    <div id="tab-nyaya" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-blue-400">1. Nyaya Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Rsi Gautama (Aksapada Gautama)</p>
+                            </div>
+                            <i class="fa-solid fa-scale-balanced text-4xl text-white/10"></i>
+                        </div>
+                        
+                        <p class="text-gray-300 mb-4">Sistem filsafat yang memberikan perhatian besar terhadap <strong>logika, penalaran, dan pengetahuan yang benar</strong>.</p>
+                        
+                        <div class="grid md:grid-cols-2 gap-4 mb-6">
+                            <div class="bg-blue-900/30 p-4 rounded-xl border border-blue-500/20">
+                                <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-graduation-cap text-blue-400 mr-2"></i>Kemampuan</h4>
+                                <ul class="list-disc pl-5 text-sm text-gray-300 space-y-1">
+                                    <li>Berpikir logis.</li>
+                                    <li>Menganalisis informasi.</li>
+                                    <li>Membedakan pengetahuan benar dan keliru.</li>
+                                    <li>Menarik kesimpulan berdasarkan alasan tepat.</li>
+                                </ul>
+                            </div>
+                            <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                                <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                                <p class="text-sm text-gray-300">Sebelum mempercayai informasi di media sosial, kita perlu memeriksa sumber, bukti, dan alasan pendukung informasi tersebut.</p>
+                            </div>
+                        </div>
+
+                        <!-- INTERACTIVE SIMULATION: Kalkulator Logika -->
+                        <div class="bg-brand-base rounded-xl p-5 border border-white/10 mt-6 relative overflow-hidden shadow-inner">
+                            <div class="absolute top-0 right-0 bg-blue-500 text-xs font-bold px-3 py-1 rounded-bl-lg">Simulasi Interaktif</div>
+                            <h4 class="font-bold text-lg mb-1"><i class="fa-solid fa-calculator text-blue-400"></i> Kalkulator Logika Nyaya</h4>
+                            <p class="text-xs text-gray-400 mb-4">Uji sebuah informasi menggunakan filter logika dasar.</p>
+                            
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-sm mb-1 text-gray-300">Pilih Informasi yang diterima:</label>
+                                    <select id="sim-nyaya-input" class="w-full bg-brand-dark border border-gray-600 rounded-lg p-2 text-white outline-none focus:border-blue-500">
+                                        <option value="" disabled selected>-- Pilih Kasus --</option>
+                                        <option value="hoaks">Pesan WA: "Besok kiamat karena posisi planet sejajar, sebarkan!"</option>
+                                        <option value="fakta">Berita Web Resmi BMKG: "Prakiraan cuaca esok hari hujan lebat di Bali."</option>
+                                        <option value="opini">Teman bilang: "Kayaknya soal ulangan besok susah banget deh."</option>
+                                    </select>
+                                </div>
+                                <button onclick="runNyayaSim()" class="bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold py-2 px-4 rounded-lg transition-colors w-full sm:w-auto">
+                                    <i class="fa-solid fa-filter"></i> Saring Informasi (Pramana)
+                                </button>
+                                
+                                <div id="sim-nyaya-result" class="hidden mt-3 p-3 rounded-lg text-sm border">
+                                    <!-- Result will appear here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Vaiseshika -->
+                    <div id="tab-vaiseshika" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-teal-400">2. Vaiseshika Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Rsi Kanada</p>
+                            </div>
+                            <i class="fa-solid fa-cubes text-4xl text-white/10"></i>
+                        </div>
+                        <p class="text-gray-300 mb-4">Sistem filsafat yang memberikan perhatian terhadap <strong>hakikat realitas dan berbagai kategori</strong> yang terdapat dalam realitas (Padartha).</p>
+                        
+                        <div class="bg-brand-base p-4 rounded-xl border border-white/10 mb-4">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-microscope text-teal-400 mr-2"></i>Fokus Pemikiran</h4>
+                            <p class="text-sm text-gray-300">Membantu manusia memahami bahwa realitas alam semesta dapat dikaji, diurai, dan dikategorikan secara sistematis dan ilmiah.</p>
+                        </div>
+
+                        <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                            <p class="text-sm text-gray-300">Peserta didik dapat menggunakan kemampuan mengelompokkan dan mengidentifikasi berbagai objek atau fenomena secara sistematis ketika melakukan penelitian atau praktikum di sekolah.</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Samkhya -->
+                    <div id="tab-samkhya" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-rose-400">3. Samkhya Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Rsi Kapila</p>
+                            </div>
+                            <i class="fa-solid fa-yin-yang text-4xl text-white/10"></i>
+                        </div>
+                        <p class="text-gray-300 mb-4">Sistem filsafat dualistis yang menjelaskan penciptaan dan realitas melalui dua prinsip utama: <strong>Purusa</strong> dan <strong>Prakrti</strong>.</p>
+                        
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
+                                <h4 class="font-bold text-rose-300 mb-1">Purusa</h4>
+                                <p class="text-xs text-gray-400">Prinsip Kesadaran (Roh/Jiwa yang pasif)</p>
+                            </div>
+                            <div class="bg-white/5 p-4 rounded-xl border border-white/10 text-center">
+                                <h4 class="font-bold text-amber-300 mb-1">Prakrti</h4>
+                                <p class="text-xs text-gray-400">Prinsip Materi (Alam/Fisik yang aktif)</p>
+                            </div>
+                        </div>
+
+                        <p class="text-sm text-gray-300 mb-4 bg-brand-base p-3 rounded-lg border-l-4 border-rose-500">Ajaran ini menekankan pemahaman terhadap perbedaan antara keduanya (Purusa bukan Prakrti) sebagai bagian dari jalan menuju pembebasan (Moksa).</p>
+
+                        <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                            <p class="text-sm text-gray-300">Mendorong kesadaran bahwa kehidupan tidak hanya melulu soal aspek material (harta, fisik), tetapi juga harus memperhatikan aspek kesadaran (spiritual, moral).</p>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Yoga -->
+                    <div id="tab-yoga" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-indigo-400">4. Yoga Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Rsi Patanjali</p>
+                            </div>
+                            <i class="fa-solid fa-om text-4xl text-white/10"></i>
+                        </div>
+                        <p class="text-gray-300 mb-4">Sistem yang sangat praktis, menekankan pada <strong>disiplin dan pengendalian diri</strong> untuk mencapai keadaan spiritual yang lebih tinggi (penyatuan).</p>
+                        
+                        <div class="bg-brand-base p-4 rounded-xl border border-white/10 mb-4">
+                            <p class="text-sm text-gray-300">Memiliki hubungan erat dengan praktik:</p>
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                <span class="bg-indigo-500/20 text-indigo-300 text-xs px-3 py-1 rounded-full">Pengendalian Pikiran</span>
+                                <span class="bg-indigo-500/20 text-indigo-300 text-xs px-3 py-1 rounded-full">Konsentrasi (Dharana)</span>
+                                <span class="bg-indigo-500/20 text-indigo-300 text-xs px-3 py-1 rounded-full">Meditasi (Dhyana)</span>
+                                <span class="bg-indigo-500/20 text-indigo-300 text-xs px-3 py-1 rounded-full">Disiplin Diri (Yama/Niyama)</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                            <p class="text-sm text-gray-300 mb-2">Peserta didik dapat menerapkan pengendalian diri melalui:</p>
+                            <ul class="list-disc pl-5 text-sm text-gray-300 space-y-1">
+                                <li>Mengatur pikiran saat belajar.</li>
+                                <li>Mengendalikan emosi (tidak mudah marah).</li>
+                                <li>Menjaga konsentrasi.</li>
+                                <li>Melakukan refleksi diri.</li>
+                                <li>Membangun kebiasaan hidup yang disiplin.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Mimamsa -->
+                    <div id="tab-mimamsa" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-amber-500">5. Mimamsa Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Rsi Jaimini</p>
+                            </div>
+                            <i class="fa-solid fa-fire text-4xl text-white/10"></i>
+                        </div>
+                        <p class="text-gray-300 mb-4">Filsafat yang memberikan perhatian khusus terhadap <strong>kewajiban, pelaksanaan tindakan keagamaan (Yadnya), dan otoritas kitab Weda</strong>.</p>
+                        
+                        <div class="bg-brand-base p-4 rounded-xl border border-white/10 mb-4">
+                            <p class="text-sm text-gray-300">Membantu memahami pentingnya pelaksanaan kewajiban (Dharma) berdasarkan prinsip dan ajaran suci yang menjadi landasannya, bukan sekadar rutinitas kosong.</p>
+                        </div>
+
+                        <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                            <p class="text-sm text-gray-300">Peserta didik menerapkan nilai tanggung jawab (Dharma) dengan cara:</p>
+                            <ul class="list-disc pl-5 text-sm text-gray-300 mt-1 space-y-1">
+                                <li>Melaksanakan kewajiban belajar dengan niat baik.</li>
+                                <li>Menghormati orang tua dan guru.</li>
+                                <li>Menjalankan tugas sehari-hari dengan sungguh-sungguh dan tulus.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Vedanta -->
+                    <div id="tab-vedanta" class="tab-content hidden animate-fade-in">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-2xl font-bold text-fuchsia-400">6. Vedanta Darsana</h3>
+                                <p class="text-gray-400 mt-1"><i class="fa-solid fa-user-pen mr-1"></i> Tokoh: Badarayana & Pemikir berikutnya (Sankara, Ramanuja, dll)</p>
+                            </div>
+                            <i class="fa-solid fa-mountain-sun text-4xl text-white/10"></i>
+                        </div>
+                        <p class="text-gray-300 mb-4">Sistem filsafat yang berhubungan erat dengan bagian akhir Weda (Upanisad). Fokus pada pengetahuan tertinggi <em>(Jnana)</em>.</p>
+                        
+                        <div class="bg-brand-base p-4 rounded-xl border border-white/10 mb-4 flex flex-col md:flex-row gap-4">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-white text-sm mb-1 text-fuchsia-300">Fokus Pembahasan Utama:</h4>
+                                <ul class="list-disc pl-5 text-sm text-gray-300">
+                                    <li>Realitas Tertinggi (Brahman).</li>
+                                    <li>Hakikat Jiwa Individu (Atman).</li>
+                                    <li>Pembebasan (Moksa).</li>
+                                </ul>
+                            </div>
+                            <div class="flex-1 bg-fuchsia-900/20 p-3 rounded-lg border border-fuchsia-500/20 flex items-center">
+                                <p class="text-xs italic text-gray-300 text-center w-full">"Atman (Jiwa) dan Brahman (Tuhan) pada hakikatnya memiliki hubungan yang tunggal/tak terpisahkan."</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-900/30 p-4 rounded-xl border border-emerald-500/20">
+                            <h4 class="font-bold text-white mb-2"><i class="fa-solid fa-check-double text-emerald-400 mr-2"></i>Penerapan (Aplikasi)</h4>
+                            <p class="text-sm text-gray-300">Mendorong manusia untuk melakukan refleksi/perenungan mendalam mengenai hakikat diri sendiri, memahami hubungan harmoni antara manusia dengan Tuhan (Realitas tertinggi), serta memahami tujuan akhir kehidupan.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <div class="mt-8 text-right">
+                <button onclick="navTo('evaluasi')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-lg">
+                    Lanjut ke Kuis & Refleksi <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- SECTION 5: EVALUASI (KUIS & REFLEKSI) -->
+        <section id="evaluasi" class="spa-section">
+            <div class="mb-8 flex items-center justify-between">
+                <div>
+                    <h2 class="text-3xl font-bold"><i class="fa-solid fa-gamepad text-emerald-400 mr-2"></i> Kuis & Refleksi</h2>
+                    <p class="text-gray-400 mt-1">Uji pemahamanmu dan tinggalkan kesan belajar hari ini.</p>
+                </div>
+                <button onclick="navTo('materi')" class="glass-card px-4 py-2 rounded-lg text-sm hover:bg-white/5"><i class="fa-solid fa-arrow-left mr-1"></i> Materi</button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Kolom Kuis (Zepquizz) -->
+                <div class="glass-panel rounded-2xl p-6 flex flex-col h-full">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-trophy text-yellow-400"></i> Mini Kuis Interaktif</h3>
+                    <p class="text-sm text-gray-300 mb-4">Mainkan kuis di bawah ini. Jika tampilan kuis tidak muncul sempurna, gunakan tombol "Buka Tab Baru".</p>
+                    
+                    <!-- Iframe Container -->
+                    <div class="flex-grow w-full bg-white/5 rounded-xl border border-white/10 overflow-hidden relative min-h-[400px]">
+                        <iframe src="https://quiz.zep.us/id/play/Gd1QOR" class="w-full h-full absolute top-0 left-0" style="border: none;" allowfullscreen></iframe>
+                    </div>
+                    
+                    <a href="https://quiz.zep.us/id/play/Gd1QOR" target="_blank" class="mt-4 block text-center bg-white/10 hover:bg-white/20 border border-white/20 text-white py-2 rounded-lg transition-colors text-sm font-semibold">
+                        <i class="fa-solid fa-external-link-alt mr-1"></i> Buka Kuis di Tab Baru (Layar Penuh)
+                    </a>
+                </div>
+
+                <!-- Kolom Refleksi Kolaboratif -->
+                <div class="glass-panel rounded-2xl p-6 flex flex-col h-full">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-notes-medical text-pink-400"></i> Papan Refleksi Virtual</h3>
+                    <p class="text-sm text-gray-300 mb-4">Apa pelajaran bermakna yang kamu dapatkan tentang Darsana hari ini?</p>
+                    
+                    <form id="reflection-form" class="mb-6 space-y-3">
+                        <input type="text" id="ref-name" placeholder="Nama / Panggilan" required class="w-full bg-brand-dark border border-gray-600 rounded-lg p-3 text-sm text-white outline-none focus:border-pink-500 transition-colors">
+                        <div class="flex gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="mood" value="😊" checked class="peer sr-only">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white/5 peer-checked:bg-pink-500/30 peer-checked:border-pink-500 border border-transparent transition-all">😊</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="mood" value="🤔" class="peer sr-only">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white/5 peer-checked:bg-pink-500/30 peer-checked:border-pink-500 border border-transparent transition-all">🤔</div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="mood" value="🤯" class="peer sr-only">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center text-xl bg-white/5 peer-checked:bg-pink-500/30 peer-checked:border-pink-500 border border-transparent transition-all">🤯</div>
+                            </label>
+                        </div>
+                        <textarea id="ref-message" rows="2" placeholder="Tulis pesan refleksi singkatmu di sini..." required class="w-full bg-brand-dark border border-gray-600 rounded-lg p-3 text-sm text-white outline-none focus:border-pink-500 transition-colors resize-none"></textarea>
+                        <button type="submit" class="w-full bg-pink-600 hover:bg-pink-500 text-white font-bold py-2 rounded-lg transition-colors">Tempel Note</button>
+                    </form>
+
+                    <!-- Sticky Notes Container -->
+                    <div id="notes-container" class="flex-grow bg-brand-dark/50 rounded-xl p-4 border border-white/5 overflow-y-auto max-h-[250px] grid grid-cols-2 gap-3 content-start">
+                        <!-- Default dummy note -->
+                        <div class="bg-yellow-200/90 text-gray-800 p-3 rounded-lg shadow-md text-xs relative transform rotate-1">
+                            <div class="font-bold mb-1 border-b border-yellow-300/50 pb-1">Budi 😊</div>
+                            <p>Ternyata filsafat Hindu itu logis banget, terutama bagian Nyaya buat ngecek hoaks!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/10 mt-auto bg-brand-base/80 backdrop-blur-sm z-10 relative">
+        <div class="max-w-7xl mx-auto px-4 py-4 text-center text-gray-400 text-xs flex flex-col md:flex-row justify-between items-center gap-2">
+            <p>Mata Pelajaran Pendidikan Agama Hindu & Budi Pekerti - SMA Kelas XI</p>
+            <p>Dibuat untuk keperluan Media Pembelajaran Interaktif SPA.</p>
+        </div>
+    </footer>
+
+    <!-- -->
+    <script>
+        // --- 1. Audio System (Web Audio API Synthesizer) ---
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let audioEnabled = true;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            }
+            if(audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('btn-audio');
+            if(audioEnabled) {
+                btn.innerHTML = '<i class="fa-solid fa-volume-up"></i>';
+                btn.classList.add('text-blue-400');
+                btn.classList.remove('text-gray-300');
+                playClick();
+            } else {
+                btn.innerHTML = '<i class="fa-solid fa-volume-xmark"></i>';
+                btn.classList.remove('text-blue-400');
+                btn.classList.add('text-gray-300');
+            }
+        }
+
+        function playTone(freq, type, duration, vol=0.1) {
+            if (!audioEnabled) return;
+            try {
+                initAudio();
+                const oscillator = audioCtx.createOscillator();
+                const gainNode = audioCtx.createGain();
+                oscillator.type = type;
+                oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                oscillator.connect(gainNode);
+                gainNode.connect(audioCtx.destination);
+                oscillator.start();
+                gainNode.gain.setValueAtTime(vol, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+                oscillator.stop(audioCtx.currentTime + duration);
+            } catch (e) { console.log("Audio play error", e); }
+        }
+
+        function playClick() { playTone(600, 'sine', 0.1, 0.05); }
+        function playSuccess() { 
+            playTone(600, 'sine', 0.1, 0.1); 
+            setTimeout(() => playTone(800, 'sine', 0.15, 0.1), 100); 
+        }
+        function playError() { playTone(200, 'sawtooth', 0.3, 0.1); }
+
+        // Trigger audio context on first interaction globally
+        document.body.addEventListener('click', initAudio, { once: true });
+
+
+        // --- 2. Navigation Logic (SPA) ---
+        function navTo(sectionId) {
+            playClick();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            // Hide all sections
+            document.querySelectorAll('.spa-section').forEach(sec => {
+                sec.classList.remove('active');
+            });
+            
+            // Show target
+            const target = document.getElementById(sectionId);
+            if(target) {
+                target.classList.add('active');
+            }
+        }
+
+        function toggleMobileMenu() {
+            playClick();
+            // Simple logic for mobile: navigate back home acts as menu
+            navTo('home');
+        }
+
+        // --- 3. Flip Card Logic ---
+        function toggleFlip(element) {
+            element.classList.toggle('flipped');
+        }
+
+        //        // --- 4. Tabs Logic (Materi) ---
+        function openTab(tabId, btnElement) {
+            playClick();
+            // Hide all tab content
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+                tab.classList.remove('block');
+            });
+            // Remove active state from all buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show specific tab
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            document.getElementById('tab-' + tabId).classList.add('block');
+            // Set active state on button
+            btnElement.classList.add('active');
+        }
+
+
+        // --- 5. Interactive Simulation: Kalkulator Logika Nyaya ---
+        function runNyayaSim() {
+            const inputVal = document.getElementById('sim-nyaya-input').value;
+            const resDiv = document.getElementById('sim-nyaya-result');
+            
+            if (!inputVal) {
+                playError();
+                resDiv.className = "mt-3 p-3 rounded-lg text-sm border border-red-500/50 bg-red-500/10 text-red-300 block animate-fade-in";
+                resDiv.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> Pilih informasi terlebih dahulu!';
+                return;
+            }
+
+            resDiv.classList.remove('hidden');
+            resDiv.classList.add('block', 'animate-fade-in');
+
+            if (inputVal === 'hoaks') {
+                playSuccess();
+                resDiv.className = "mt-3 p-3 rounded-lg text-sm border border-yellow-500/50 bg-yellow-500/10 text-yellow-300 block animate-fade-in";
+                resDiv.innerHTML = '<strong>Hasil Analisis (Anumana/Penyimpulan):</strong><br>Sumber tidak jelas (bukan ahli astronomi). Alasan tidak logis. <strong>Kesimpulan: TIDAK VALID (Perlu diabaikan/dicek fakta).</strong>';
+            } else if (inputVal === 'fakta') {
+                playSuccess();
+                resDiv.className = "mt-3 p-3 rounded-lg text-sm border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 block animate-fade-in";
+                resDiv.innerHTML = '<strong>Hasil Analisis (Sabda/Kesaksian Otoritas):</strong><br>Sumber otoritatif (BMKG). Didukung instrumen ilmiah (Pratyaksa/Persepsi). <strong>Kesimpulan: VALID (Dapat dipercaya).</strong>';
+            } else if (inputVal === 'opini') {
+                playClick();
+                resDiv.className = "mt-3 p-3 rounded-lg text-sm border border-blue-500/50 bg-blue-500/10 text-blue-300 block animate-fade-in";
+                resDiv.innerHTML = '<strong>Hasil Analisis:</strong><br>Ini adalah persepsi subjektif. <strong>Kesimpulan: OPINI.</strong> Perlu pembuktian langsung (Pratyaksa) saat melihat soal ujian nanti.';
+            }
+        }
+
+
+        // --- 6. Reflection Board Logic ---
+        document.getElementById('reflection-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('ref-name').value;
+            const msg = document.getElementById('ref-message').value;
+            const mood = document.querySelector('input[name="mood"]:checked').value;
+            
+            if(name && msg) {
+                addStickyNote(name, mood, msg);
+                
+                // Audio and Visual Feedback
+                playSuccess();
+                confetti({
+                    particleCount: 50,
+                    spread: 60,
+                    origin: { y: 0.8 },
+                    colors: ['#f472b6', '#60a5fa', '#34d399']
+                });
+                
+                // Clear form
+                document.getElementById('ref-name').value = '';
+                document.getElementById('ref-message').value = '';
+            }
+        });
+
+        function addStickyNote(name, mood, msg) {
+            const container = document.getElementById('notes-container');
+            
+            // Randomize slightly for sticky note look
+            const colors = ['bg-yellow-200/90 text-yellow-900', 'bg-pink-200/90 text-pink-900', 'bg-blue-200/90 text-blue-900', 'bg-green-200/90 text-green-900'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const rotation = (Math.random() * 6 - 3).toFixed(1); // -3 to 3 degrees
+            
+            const noteDiv = document.createElement('div');
+            noteDiv.className = `${randomColor} p-3 rounded-lg shadow-md text-xs relative transform transition-transform hover:scale-105 animate-fade-in`;
+            noteDiv.style.transform = `rotate(${rotation}deg)`;
+            
+            // Sanitize input basic
+            const safeName = name.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            const safeMsg = msg.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            
+            noteDiv.innerHTML = `
+                <div class="font-bold mb-1 border-b border-black/10 pb-1 flex justify-between">
+                    <span>${safeName}</span>
+                    <span>${mood}</span>
+                </div>
+                <p class="leading-tight">${safeMsg}</p>
+            `;
+            
+            container.prepend(noteDiv);
+        }
+    </script>
+</body>
+</html>
